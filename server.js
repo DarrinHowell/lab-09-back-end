@@ -116,6 +116,11 @@ function searchFood(query){
   const yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
 
   return superagent.get(yelpData)
+  //YELP documentation REQUIRED to have .set with Authorization and 'Bearer' in the process.env API Key
+  //superagent returns the yelp data variable and sets authorization to the template literal.
+  //this is how yelp is feed the key
+  //once we recieve back the results from YELP, we then normalize the data with the object constructor.
+  //Send it back to our app.get function above.  Then send it back to our client.
   .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
   .then(result  => {
     let search = JSON.parse(result.text);
@@ -135,6 +140,10 @@ function Food(data){
 
 //--------Movies-------//
 
+//Follow the same pattern as searchFood
+//query for movies includes the API key inside the URL.  no need for .set like in YELP.
+//we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
+//We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
 function searchMovies(query){
   let city = query.formatted_query.split(',')[0];
   console.log(city);
@@ -158,7 +167,7 @@ function Movie(data){
   this.popularity = data.popularity;
   this.released_on = data.release_date;
 }
-
+//image url has prepended pathway so the path actually shows image and not just data link
 
 
 app.listen(PORT, () => console.log(`App is up on ${PORT}`));
