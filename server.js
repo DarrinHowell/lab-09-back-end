@@ -21,15 +21,8 @@ app.use(cors());
 /*----get functions-----*/
 
 
-app.get('/', (request, response) => {
-  response.send('server is on');
-});
 
-app.get('/location', (request, response) => {
-  const locationData = searchToLatLong(request.query.data)
-    .then(locationData => response.send(locationData))
-    .catch(error => handleError(error, response));
-});
+app.get('/location', getLocation);
 
 app.get('/weather', (request, response) => {
   const weatherData = searchWeather(request.query.data)
@@ -64,26 +57,70 @@ function handleError(err, response) {
 
 
 /*-------LOCATION--------*/
+function Location(data) {
+  this.formatted_query = data.formatted_address;
+  this.latitude = data.geometry.location.lat;
+  this.longitude = data.geometry.location.lng;
+}
 
-function searchToLatLong(query) {
+Location.prototype.save = function(){
+  let SQL = `
+  INSERT INTO location
+    (search_query,formatted_query,latitude,longitude)
+    VALUES($1,$2,$3,$4)`;
+
+    let values = Object.values(this);
+    client.query(SQL, values);
+};
+
+Location.searchToLatLong = (query) => {
   const googleData = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GEOCODE_API_KEY}`;
   return superagent.get(googleData)
     .then(data => {
       if (!data.body.results.length) {
         throw 'No Data';
       } else {
-        let location = new Location(data.body.results[0])
-        location.search_query = query;
+        let location = new Location(data.body.results[0]);
+        location.save();
         return location;
       }
-    })
+    });
+};
+
+function getLocation(req, res){
+  const locationHandler = {
+    query: req.query.data,
+  
+    cacheHit: (results) => {
+      console.log('Got Data From SQL');
+      res.send(results.rows[0]);
+    },
+
+    cacheMiss: () => {
+      Location.searchToLatLong(req.query.data)
+      .then(data => res.send(data));
+      console.log('Got Data from API');
+    },
+
+  };
+  Location.lookupLocation(locationHandler);
 }
 
-function Location(data) {
-  this.formatted_query = data.formatted_address;
-  this.latitude = data.geometry.location.lat;
-  this.longitude = data.geometry.location.lng;
-}
+Location.lookupLocation = (handler) => {
+  const SQL = `SELECT * FROM location WHERE search_query=$1`;
+  const values = [handler.query];
+
+  return client.query(SQL, values)
+  .then(results => {
+    if(results.rowCount > 0){
+      handler.cacheHit(resutls);
+    }else{
+      handler.cacheMiss();
+    }
+  })
+  .catch(console.error);
+};
+
 
 
 
