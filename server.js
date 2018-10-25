@@ -162,7 +162,7 @@ Weather.searchWeather = function(query) {
   .then(result => {
     const weatherSummaries = result.body.daily.data.map(day => {
       const summary = new Weather(day);
-      summary.save(location.id);
+      summary.save(query.id);
       return summary;
     });
       return weatherSummaries;
@@ -173,10 +173,10 @@ function getWeather(req, res){
   const handler = {
     location: req.query.data,
     cacheHits: function(result){
-      response.send(result.rows);
+      res.send(result.rows);
     },
     cacheMiss: function() {
-      Weather.fetch(req.query.data)
+      Weather.searchWeather(req.query.data)
       .then(results => res.send(results))
       .catch(console.error);
     },
