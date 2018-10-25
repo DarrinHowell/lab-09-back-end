@@ -140,6 +140,7 @@ function Food(data){
 
 //--------Movies-------//
 
+//Follow the same pattern as searchFood
 function searchMovies(query){
   let city = query.formatted_query.split(',')[0];
   console.log(city);
@@ -164,7 +165,6 @@ function Movie(data){
   this.released_on = data.release_date;
 }
 //image url has prepended pathway so the path actually shows image and not just data link
-//
 
 
 app.listen(PORT, () => console.log(`App is up on ${PORT}`));
