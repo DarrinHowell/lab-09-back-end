@@ -141,6 +141,9 @@ function Food(data){
 //--------Movies-------//
 
 //Follow the same pattern as searchFood
+//query for movies includes the API key inside the URL.  no need for .set like in YELP.
+//we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
+//We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
 function searchMovies(query){
   let city = query.formatted_query.split(',')[0];
   console.log(city);
