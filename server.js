@@ -116,6 +116,11 @@ function searchFood(query){
   const yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
 
   return superagent.get(yelpData)
+  //YELP documentation REQUIRED to have .set with Authorization and 'Bearer' in the process.env API Key
+  //superagent returns the yelp data variable and sets authorization to the template literal.
+  //this is how yelp is feed the key
+  //once we recieve back the results from YELP, we then normalize the data with the object constructor.
+  //Send it back to our app.get function above.  Then send it back to our client.
   .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
   .then(result  => {
     let search = JSON.parse(result.text);
