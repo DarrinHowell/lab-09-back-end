@@ -24,11 +24,7 @@ app.use(cors());
 
 app.get('/location', getLocation);
 
-app.get('/weather', (request, response) => {
-  const weatherData = searchWeather(request.query.data)
-    .then(weatherData => response.send(weatherData))
-    .catch(error => handleError(error, response));
-});
+app.get('/weather', getWeather);
 
 app.get('/yelp', (request, response) => {
   const yelpData = searchFood(request.query.data)
@@ -125,26 +121,70 @@ Location.lookupLocation = (handler) => {
 
 
 /*--------WEATHER-------*/
-
-function searchWeather(query) {
-  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
-  
-  return superagent.get(darkSkyData)
-  .then(result => {
-    return result.body.daily.data.map(day => {
-      return new Weather(day); 
-    });
-  })
-
-}
-
-
 // Refactored this.time to use the toDateString() to parse the object data// 
 function Weather(data) {
   let day = new Date(data.time * 1000);
   this.time = day.toDateString();
   this.forecast = data.summary;
 }
+
+Weather.prototype.save = function(){
+  let SQL = `
+  INSERT INTO weather
+    (forecast, time, location_id)
+    VALUES($1,$2,$3)`;
+
+    let values = Object.values(this);
+    client.query(SQL, values);
+};
+
+Weather.lookup = function(handler){
+  const SQL = `SELECT * FROM weather WHERE location_id=$1`;
+  client.query(SQL, [handler.location.id])
+  .then(results => {
+    if(results.rowCount > 0){
+      console.log('Got data from sql');
+      handler.cacheHit(result);
+    }else{
+      console.log('Got data from API');
+      handler.cacheMiss();
+    }
+  })
+  .catch(error => handleError(error));
+};
+
+
+
+Weather.searchWeather = function(query) {
+  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
+  
+  return superagent.get(darkSkyData)
+  .then(result => {
+    const weatherSummaries = result.body.daily.data.map(day => {
+      const summary = new Weather(day);
+      summary.save(location.id);
+      return summary;
+    });
+      return weatherSummaries;
+    });
+};
+
+function getWeather(req, res){
+  const handler = {
+    location: req.query.data,
+    cacheHits: function(result){
+      response.send(result.rows);
+    },
+    cacheMiss: function() {
+      Weather.fetch(req.query.data)
+      .then(results => res.send(results))
+      .catch(console.error);
+    },
+  };
+  Weather.lookup(handler);
+}
+
+
 
 
 //------Yelp--------//
