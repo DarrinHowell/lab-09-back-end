@@ -1,7 +1,7 @@
 {
-  "name": "lab-08-back-end",
+  "name": "lab-09-backend",
   "version": "1.0.0",
-  "description": "lab-08",
+  "description": "city_explorer_backend_servers",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,19 +9,22 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CaityHeath/lab-08-back-end.git"
+    "url": "git+https://github.com/DarrinHowell/lab-09-back-end.git"
   },
-  "author": "darrin-howell-caity-heath-carlos-castillo",
-  "license": "MIT",
+  "keywords": [
+    "backend"
+  ],
+  "author": "DarrinHowell",
+  "license": "ISC",
   "bugs": {
-    "url": "https://github.com/CaityHeath/lab-08-back-end/issues"
+    "url": "https://github.com/DarrinHowell/lab-09-back-end/issues"
   },
-  "homepage": "https://github.com/CaityHeath/lab-08-back-end#readme",
+  "homepage": "https://github.com/DarrinHowell/lab-09-back-end#readme",
   "dependencies": {
     "cors": "^2.8.4",
     "dotenv": "^6.1.0",
     "express": "^4.16.4",
-    "pg": "^7.5.0",
+    "pg": "^7.6.0",
     "superagent": "^4.0.0-beta.5"
   }
 }
