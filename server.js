@@ -34,13 +34,13 @@ app.get('/yelp', (request, response) => {
 
 app.get('/movies', (request, response) => {
   const movieData= searchMovies(request.query.data)
-  .then(movieData => response.send(movieData))
-  .catch(error => handleError(error, response));
+    .then(movieData => response.send(movieData))
+    .catch(error => handleError(error, response));
 });
 
 
 /* ------Error Handler-----
-Error handler will send an error message when 
+Error handler will send an error message when
 the server can't handle their input */
 
 
@@ -59,17 +59,24 @@ function Location(data) {
   this.longitude = data.geometry.location.lng;
 }
 
+
+
 Location.prototype.save = function(){
   let SQL = `
   INSERT INTO location
     (search_query,formatted_query,latitude,longitude)
     VALUES($1,$2,$3,$4)`;
 
-    let values = Object.values(this);
-    client.query(SQL, values);
+  let values = Object.values(this);
+  client.query(SQL, values);
 };
 
-Location.searchToLatLong = (query) => {
+// Our refactored getLatLongData code builds a query string and requests data from the Google GEOCODE API via
+// superagent. After that request has been made and Google serves something back to us, our function
+// either throws a 'No Data' error if we don't receive data back, or if we receive data back, we
+// create a new location object and save that object to SQL. Finally we send that location data
+// back to get the getLocation function, ultimately sending the data to the front end.
+Location.getLatLongData = (query) => {
   const googleData = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GEOCODE_API_KEY}`;
   return superagent.get(googleData)
     .then(data => {
@@ -83,18 +90,23 @@ Location.searchToLatLong = (query) => {
     });
 };
 
+// Our refactored getLocation function recieves a request and a response from the express get() function
+// in which this callback is nested.
+// a location hanler object is then instantiated with a query property, a cacheHit function, and a
+// cacheMiss function. This function then sends the locationHandler to a lookupLocation function
+// outlined below. 
 function getLocation(req, res){
   const locationHandler = {
     query: req.query.data,
-  
+
     cacheHit: (results) => {
       console.log('Got Data From SQL');
       res.send(results.rows[0]);
     },
 
     cacheMiss: () => {
-      Location.searchToLatLong(req.query.data)
-      .then(data => res.send(data));
+      Location.getLatLongData(req.query.data)
+        .then(data => res.send(data));
       console.log('Got Data from API');
     },
 
@@ -102,26 +114,35 @@ function getLocation(req, res){
   Location.lookupLocation(locationHandler);
 }
 
+// This method takes in a locationHandler object as outlined above in getLocation. 
+// This funciton creates an SQL query via pg's client object that checks if the data from the front end
+// query matches any data in our SQL database. 
+// After waiting to hear back from the postgres SQL query, if the results come back with database with any rows
+// we call the cacheHit function from our handler and send data back to the front end. (This conditional)
+// is effective because location is the first query made and therefore should be the first and only row
+// in our database. 
+// If we do not come back with a database that has any location data, we invoke cache.Miss from our handler
+// object and perform a query to the Google GEOCODE API. 
 Location.lookupLocation = (handler) => {
-  const SQL = `SELECT * FROM location WHERE search_query=$1`;
+  const SQL = 'SELECT * FROM location WHERE search_query=$1';
   const values = [handler.query];
 
   return client.query(SQL, values)
-  .then(results => {
-    if(results.rowCount > 0){
-      handler.cacheHit(resutls);
-    }else{
-      handler.cacheMiss();
-    }
-  })
-  .catch(console.error);
+    .then(results => {
+      if(results.rowCount > 0){
+        handler.cacheHit(results);
+      }else{
+        handler.cacheMiss();
+      }
+    })
+    .catch(console.error);
 };
 
 
 
 
 /*--------WEATHER-------*/
-// Refactored this.time to use the toDateString() to parse the object data// 
+// Refactored this.time to use the toDateString() to parse the object data//
 function Weather(data) {
   let day = new Date(data.time * 1000);
   this.time = day.toDateString();
@@ -134,37 +155,37 @@ Weather.prototype.save = function(){
     (forecast, time, location_id)
     VALUES($1,$2,$3)`;
 
-    let values = Object.values(this);
-    client.query(SQL, values);
+  let values = Object.values(this);
+  client.query(SQL, values);
 };
 
 Weather.lookup = function(handler){
-  const SQL = `SELECT * FROM weather WHERE location_id=$1`;
+  const SQL = 'SELECT * FROM weather WHERE location_id=$1';
   client.query(SQL, [handler.location.id])
-  .then(results => {
-    if(results.rowCount > 0){
-      console.log('Got data from sql');
-      handler.cacheHit(result);
-    }else{
-      console.log('Got data from API');
-      handler.cacheMiss();
-    }
-  })
-  .catch(error => handleError(error));
+    .then(results => {
+      if(results.rowCount > 0){
+        console.log('Got data from sql');
+        handler.cacheHit(result);
+      }else{
+        console.log('Got data from API');
+        handler.cacheMiss();
+      }
+    })
+    .catch(error => handleError(error));
 };
 
 
 
 Weather.searchWeather = function(query) {
   const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
-  
+
   return superagent.get(darkSkyData)
-  .then(result => {
-    const weatherSummaries = result.body.daily.data.map(day => {
-      const summary = new Weather(day);
-      summary.save(query.id);
-      return summary;
-    });
+    .then(result => {
+      const weatherSummaries = result.body.daily.data.map(day => {
+        const summary = new Weather(day);
+        summary.save(query.id);
+        return summary;
+      });
       return weatherSummaries;
     });
 };
@@ -177,8 +198,8 @@ function getWeather(req, res){
     },
     cacheMiss: function() {
       Weather.searchWeather(req.query.data)
-      .then(results => res.send(results))
-      .catch(console.error);
+        .then(results => res.send(results))
+        .catch(console.error);
     },
   };
   Weather.lookup(handler);
@@ -198,13 +219,13 @@ function searchFood(query){
   //this is how yelp is feed the key
   //once we recieve back the results from YELP, we then normalize the data with the object constructor.
   //Send it back to our app.get function above.  Then send it back to our client.
-  .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
-  .then(result  => {
-    let search = JSON.parse(result.text);
-    return search.businesses.map(business =>{
-      return new Food(business);
+    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+    .then(result => {
+      let search = JSON.parse(result.text);
+      return search.businesses.map(business =>{
+        return new Food(business);
+      });
     });
-  });
 }
 
 function Food(data){
@@ -224,15 +245,15 @@ function Food(data){
 function searchMovies(query){
   let city = query.formatted_query.split(',')[0];
   console.log(city);
-  const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`
-  
+  const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`;
+
   return superagent.get(movieData)
-  .then(result => {
-    let movieSearch = JSON.parse(result.text);
-    return movieSearch.results.map(movie =>{
-      return new Movie(movie);
+    .then(result => {
+      let movieSearch = JSON.parse(result.text);
+      return movieSearch.results.map(movie =>{
+        return new Movie(movie);
+      });
     });
-  });
 }
 
 function Movie(data){
