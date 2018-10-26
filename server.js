@@ -94,7 +94,7 @@ Location.getLatLongData = (query) => {
 // in which this callback is nested.
 // a location hanler object is then instantiated with a query property, a cacheHit function, and a
 // cacheMiss function. This function then sends the locationHandler to a lookupLocation function
-// outlined below. Ultimately, this funciton is used to insert data into
+// outlined below. 
 function getLocation(req, res){
   const locationHandler = {
     query: req.query.data,
@@ -114,6 +114,15 @@ function getLocation(req, res){
   Location.lookupLocation(locationHandler);
 }
 
+// This method takes in a locationHandler object as outlined above in getLocation. 
+// This funciton creates an SQL query via pg's client object that checks if the data from the front end
+// query matches any data in our SQL database. 
+// After waiting to hear back from the postgres SQL query, if the results come back with database with any rows
+// we call the cacheHit function from our handler and send data back to the front end. (This conditional)
+// is effective because location is the first query made and therefore should be the first and only row
+// in our database. 
+// If we do not come back with a database that has any location data, we invoke cache.Miss from our handler
+// object and perform a query to the Google GEOCODE API. 
 Location.lookupLocation = (handler) => {
   const SQL = 'SELECT * FROM location WHERE search_query=$1';
   const values = [handler.query];
