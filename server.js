@@ -59,6 +59,8 @@ function Location(data) {
   this.longitude = data.geometry.location.lng;
 }
 
+
+
 Location.prototype.save = function(){
   let SQL = `
   INSERT INTO location
@@ -69,7 +71,12 @@ Location.prototype.save = function(){
     client.query(SQL, values);
 };
 
-Location.searchToLatLong = (query) => {
+// Our refactored getLatLongData code builds a query string and requests data from the Google GEOCODE API via
+// superagent. After that request has been made and Google serves something back to us, our function
+// either throws a 'No Data' error if we don't receive data back, or if we receive data back, we
+// create a new location object and save that object to SQL. Finally we send that location data 
+// back to get the getLocation function, ultimately sending the data to the front end. 
+Location.getLatLongData = (query) => {
   const googleData = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GEOCODE_API_KEY}`;
   return superagent.get(googleData)
     .then(data => {
@@ -93,7 +100,7 @@ function getLocation(req, res){
     },
 
     cacheMiss: () => {
-      Location.searchToLatLong(req.query.data)
+      Location.getLatLongData(req.query.data)
       .then(data => res.send(data));
       console.log('Got Data from API');
     },
