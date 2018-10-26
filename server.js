@@ -71,7 +71,7 @@ Location.prototype.save = function(){
   client.query(SQL, values);
 };
 
-// Our refactored getLatLongData code builds a query string and requests data from the Google GEOCODE API via
+// Our refactored getLatLongData code builds a query string and requests data from the GEOCODE API via
 // superagent. After that request has been made and Google serves something back to us, our function
 // either throws a 'No Data' error if we don't receive data back, or if we receive data back, we
 // create a new location object and save that object to SQL. Finally we send that location data
@@ -161,11 +161,11 @@ Weather.prototype.save = function(){
 
 Weather.lookup = function(handler){
   const SQL = 'SELECT * FROM weather WHERE location_id=$1';
-  client.query(SQL, [handler.location.id])
+  client.query(SQL,[handler.location.id])
     .then(results => {
       if(results.rowCount > 0){
         console.log('Got data from sql');
-        handler.cacheHit(result);
+        handler.cacheHit(results);
       }else{
         console.log('Got data from API');
         handler.cacheMiss();
@@ -177,7 +177,7 @@ Weather.lookup = function(handler){
 
 
 Weather.searchWeather = function(query) {
-  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
+  const darkSkyData = `https://api.darksky.net/forecast/${process.env.WEATHER_API_KEY}/${query.latitude},${query.longitude}`;
 
   return superagent.get(darkSkyData)
     .then(result => {
