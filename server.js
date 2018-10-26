@@ -33,10 +33,12 @@ app.get('/yelp', (request, response) => {
 });
 
 app.get('/movies', (request, response) => {
-  const movieData= searchMovies(request.query.data)
+  const movieData = searchMovies(request.query.data)
     .then(movieData => response.send(movieData))
     .catch(error => handleError(error, response));
 });
+
+app.get('/meetup', getWeather);
 
 
 /* ------Error Handler-----
@@ -53,7 +55,8 @@ function handleError(err, response) {
 
 
 /*-------LOCATION--------*/
-function Location(data) {
+function Location(query, data) {
+  this.search_query = query;
   this.formatted_query = data.formatted_address;
   this.latitude = data.geometry.location.lat;
   this.longitude = data.geometry.location.lng;
@@ -63,7 +66,7 @@ function Location(data) {
 
 Location.prototype.save = function(){
   let SQL = `
-  INSERT INTO location
+  INSERT INTO locations
     (search_query,formatted_query,latitude,longitude)
     VALUES($1,$2,$3,$4)`;
 
@@ -83,7 +86,7 @@ Location.getLatLongData = (query) => {
       if (!data.body.results.length) {
         throw 'No Data';
       } else {
-        let location = new Location(data.body.results[0]);
+        let location = new Location(query, data.body.results[0]);
         location.save();
         return location;
       }
@@ -124,7 +127,7 @@ function getLocation(req, res){
 // If we do not come back with a database that has any location data, we invoke cache.Miss from our handler
 // object and perform a query to the Google GEOCODE API. 
 Location.lookupLocation = (handler) => {
-  const SQL = 'SELECT * FROM location WHERE search_query=$1';
+  const SQL = 'SELECT * FROM locations WHERE search_query=$1';
   const values = [handler.query];
 
   return client.query(SQL, values)
@@ -191,7 +194,7 @@ Weather.searchWeather = function(query) {
 };
 
 function getWeather(req, res){
-  const handler = {
+  const weatherHandler = {
     location: req.query.data,
     cacheHits: function(result){
       res.send(result.rows);
@@ -202,7 +205,7 @@ function getWeather(req, res){
         .catch(console.error);
     },
   };
-  Weather.lookup(handler);
+  Weather.lookup(weatherHandler);
 }
 
 
