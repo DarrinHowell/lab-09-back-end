@@ -149,17 +149,18 @@ Location.lookupLocation = (handler) => {
 // Refactored this.time to use the toDateString() to parse the object data//
 function Weather(data) {
   let day = new Date(data.time * 1000);
-  this.time = day.toDateString();
+  this.time = day.toDateString().slice(0,15);
   this.forecast = data.summary;
 }
 
-Weather.prototype.save = function(){
+Weather.prototype.save = function(id){
   let SQL = `
   INSERT INTO weather
     (forecast, time, location_id)
     VALUES($1,$2,$3)`;
 
   let values = Object.values(this);
+  values.push(id)
   client.query(SQL, values);
 };
 
@@ -168,10 +169,10 @@ Weather.lookup = function(handler){
   client.query(SQL,[handler.location.id])
     .then(results => {
       if(results.rowCount > 0){
-        console.log('Got data from sql');
+        console.log('Got weather data from SQL');
         handler.cacheHit(results);
       }else{
-        console.log('Got data from API');
+        console.log('Got weather data from API');
         handler.cacheMiss();
       }
     })
@@ -198,7 +199,7 @@ Weather.searchWeather = function(query) {
 function getWeather(req, res){
   const weatherHandler = {
     location: req.query.data,
-    cacheHits: function(result){
+    cacheHit: function(result){
       res.send(result.rows);
     },
     cacheMiss: function() {
