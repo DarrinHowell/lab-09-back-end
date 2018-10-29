@@ -180,7 +180,7 @@ Weather.lookup = function(handler){
 
 
 Weather.searchWeather = function(query) {
-  const darkSkyData = `https://api.darksky.net/forecast/${process.env.WEATHER_API_KEY}/${query.latitude},${query.longitude}`;
+  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
 
   return superagent.get(darkSkyData)
     .then(result => {
