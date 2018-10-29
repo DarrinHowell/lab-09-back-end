@@ -7,7 +7,7 @@ const pg = require('pg');
 
 require('dotenv').config();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 const client = new pg.Client(process.env.DATABASE_URL);
 client.connect();
@@ -26,19 +26,19 @@ app.get('/location', getLocation);
 
 app.get('/weather', getWeather);
 
-app.get('/yelp', (request, response) => {
-  const yelpData = searchFood(request.query.data)
-    .then(yelpData => response.send(yelpData))
-    .catch(error => handleError(error, response));
-});
+// app.get('/yelp', (request, response) => {
+//   const yelpData = searchFood(request.query.data)
+//     .then(yelpData => response.send(yelpData))
+//     .catch(error => handleError(error, response));
+// });
 
-app.get('/movies', (request, response) => {
-  const movieData = searchMovies(request.query.data)
-    .then(movieData => response.send(movieData))
-    .catch(error => handleError(error, response));
-});
+// app.get('/movies', (request, response) => {
+//   const movieData = searchMovies(request.query.data)
+//     .then(movieData => response.send(movieData))
+//     .catch(error => handleError(error, response));
+// });
 
-app.get('/meetup', getWeather);
+// app.get('/meetup', getWeather);
 
 
 /* ------Error Handler-----
@@ -90,7 +90,8 @@ Location.getLatLongData = (query) => {
         location.save();
         return location;
       }
-    });
+    })
+    .catch(error => handleError(error));
 };
 
 // Our refactored getLocation function recieves a request and a response from the express get() function
@@ -190,7 +191,8 @@ Weather.searchWeather = function(query) {
         return summary;
       });
       return weatherSummaries;
-    });
+    })
+    .catch(error => handleError(error));
 };
 
 function getWeather(req, res){
@@ -211,63 +213,64 @@ function getWeather(req, res){
 
 
 
-//------Yelp--------//
+// //------Yelp--------//
 
-function searchFood(query){
-  const yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
+// function searchFood(query){
+//   const yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
 
-  return superagent.get(yelpData)
-  //YELP documentation REQUIRED to have .set with Authorization and 'Bearer' in the process.env API Key
-  //superagent returns the yelp data variable and sets authorization to the template literal.
-  //this is how yelp is feed the key
-  //once we recieve back the results from YELP, we then normalize the data with the object constructor.
-  //Send it back to our app.get function above.  Then send it back to our client.
-    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
-    .then(result => {
-      let search = JSON.parse(result.text);
-      return search.businesses.map(business =>{
-        return new Food(business);
-      });
-    });
-}
+//   return superagent.get(yelpData)
+//   //YELP documentation REQUIRED to have .set with Authorization and 'Bearer' in the process.env API Key
+//   //superagent returns the yelp data variable and sets authorization to the template literal.
+//   //this is how yelp is feed the key
+//   //once we recieve back the results from YELP, we then normalize the data with the object constructor.
+//   //Send it back to our app.get function above.  Then send it back to our client.
+//     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+//     .then(result => {
+//       let search = JSON.parse(result.text);
+//       return search.businesses.map(business =>{
+//         return new Food(business);
+//       });
+//     })
+//     .catch(error => handleError(error));
+// }
 
-function Food(data){
-  this.name = data.name;
-  this.url = data.url;
-  this.price = data.price;
-  this.image_url = data.image_url;
-  this.rating = data.rating;
-}
+// function Food(data){
+//   this.name = data.name;
+//   this.url = data.url;
+//   this.price = data.price;
+//   this.image_url = data.image_url;
+//   this.rating = data.rating;
+// }
 
-//--------Movies-------//
+// //--------Movies-------//
 
-//Follow the same pattern as searchFood
-//query for movies includes the API key inside the URL.  no need for .set like in YELP.
-//we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
-//We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
-function searchMovies(query){
-  let city = query.formatted_query.split(',')[0];
-  console.log(city);
-  const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`;
+// //Follow the same pattern as searchFood
+// //query for movies includes the API key inside the URL.  no need for .set like in YELP.
+// //we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
+// //We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
+// function searchMovies(query){
+//   let city = query.formatted_query.split(',')[0];
+//   const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`;
 
-  return superagent.get(movieData)
-    .then(result => {
-      let movieSearch = JSON.parse(result.text);
-      return movieSearch.results.map(movie =>{
-        return new Movie(movie);
-      });
-    });
-}
+//   return superagent.get(movieData)
+//     .then(result => {
+//       let movieSearch = JSON.parse(result.text);
+//       return movieSearch.results.map(movie =>{
+//         return new Movie(movie);
+//       });
+//     })
+//     .catch(error => handleError(error));
+// }
 
-function Movie(data){
-  this.title = data.title;
-  this.overview = data.overview;
-  this.average_votes = data.vote_average;
-  this.total_votes = data.vote_count;
-  this.image_url = `https://image.tmdb.org/t/p/original${data.poster_path}`;
-  this.popularity = data.popularity;
-  this.released_on = data.release_date;
-}
+// function Movie(data){
+//   this.title = data.title;
+//   this.overview = data.overview;
+//   this.average_votes = data.vote_average;
+//   this.total_votes = data.vote_count;
+//   this.image_url = `https://image.tmdb.org/t/p/original${data.poster_path}`;
+//   this.popularity = data.popularity;
+//   this.released_on = data.release_date;
+// }
 //image url has prepended pathway so the path actually shows image and not just data link
 
 
