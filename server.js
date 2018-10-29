@@ -26,11 +26,7 @@ app.get('/location', getLocation);
 
 app.get('/weather', getWeather);
 
-// app.get('/yelp', (request, response) => {
-//   const yelpData = searchFood(request.query.data)
-//     .then(yelpData => response.send(yelpData))
-//     .catch(error => handleError(error, response));
-// });
+// app.get('/yelp', getFood);
 
 // app.get('/movies', (request, response) => {
 //   const movieData = searchMovies(request.query.data)
@@ -169,10 +165,10 @@ Weather.lookup = function(handler){
   client.query(SQL,[handler.location.id])
     .then(results => {
       if(results.rowCount > 0){
-        console.log('Got weather data from SQL');
+        console.log('Getting weather data from SQL');
         handler.cacheHit(results);
       }else{
-        console.log('Got weather data from API');
+        console.log('Getting weather data from API');
         handler.cacheMiss();
       }
     })
@@ -182,9 +178,9 @@ Weather.lookup = function(handler){
 
 
 Weather.searchWeather = function(query) {
-  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
+  const _darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
 
-  return superagent.get(darkSkyData)
+  return superagent.get(_darkSkyData)
     .then(result => {
       const weatherSummaries = result.body.daily.data.map(day => {
         const summary = new Weather(day);
@@ -206,7 +202,7 @@ function getWeather(req, res){
       Weather.searchWeather(req.query.data)
         .then(results => res.send(results))
         .catch(console.error);
-    },
+    }
   };
   Weather.lookup(weatherHandler);
 }
@@ -216,10 +212,40 @@ function getWeather(req, res){
 
 // //------Yelp--------//
 
-// function searchFood(query){
-//   const yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
+// function getFood(req, res){
+//   const foodHandler = {
+//     location: req.query.data,
+//     cacheHit: function(result){
+//       res.send(result.rows);
+//     },
+//     cacheMiss: function() {
+//       Food.searchFood(req.query.data)
+//         .then(results => res.send(results))
+//         .catch(console.error);
+//     }
+//   };
+//   Food.lookup(foodHandler);
+// }
 
-//   return superagent.get(yelpData)
+// Food.lookup = function(handler){
+//   const SQL = 'SELECT * FROM yelp WHERE location_id=$1';
+//   client.query(SQL,[handler.location.id])
+//     .then(results => {
+//       if(results.rowCount > 0){
+//         console.log('Got yelp data from SQL');
+//         handler.cacheHit(results);
+//       }else{
+//         console.log('Got yelp data from API');
+//         handler.cacheMiss();
+//       }
+//     })
+//     .catch(error => handleError(error));
+// };
+
+// Food.searchFood = function (query){
+//   const _yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
+
+//   return superagent.get(_yelpData)
 //   //YELP documentation REQUIRED to have .set with Authorization and 'Bearer' in the process.env API Key
 //   //superagent returns the yelp data variable and sets authorization to the template literal.
 //   //this is how yelp is feed the key
@@ -228,9 +254,11 @@ function getWeather(req, res){
 //     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
 //     .then(result => {
 //       let search = JSON.parse(result.text);
-//       return search.businesses.map(business =>{
-//         return new Food(business);
+//       let yelpSearch = search.businesses.map(business =>{
+//         const restaurantData = new Food(business);
+//         restaurantData.save(query.id)
 //       });
+//       return yelpSearch;
 //     })
 //     .catch(error => handleError(error));
 // }
@@ -242,6 +270,17 @@ function getWeather(req, res){
 //   this.image_url = data.image_url;
 //   this.rating = data.rating;
 // }
+
+// Food.prototype.save = function(id){
+//   let SQL = `
+//   INSERT INTO yelp
+//     (name, url, price, image_url, rating, location_id)
+//     VALUES($1,$2,$3,$4,$5,$6)`;
+//   let values = Object.values(this);
+//   values.push(id)
+//   client.query(SQL, values);
+// };
+
 
 // //--------Movies-------//
 
