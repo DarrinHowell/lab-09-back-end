@@ -243,32 +243,29 @@ Food.lookup = function(handler){
 };
 
 Food.searchFood = function (query){
-  const _yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
-
-  return superagent.get(_yelpData)
-  //YELP documentation REQUIRED to have .set with Authorization and 'Bearer' in the process.env API Key
-  //superagent returns the yelp data variable and sets authorization to the template literal.
-  //this is how yelp is feed the key
-  //once we recieve back the results from YELP, we then normalize the data with the object constructor.
-  //Send it back to our app.get function above.  Then send it back to our client.
+  const _yelpURL = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}`;
+  return superagent.get(_yelpURL)
     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
     .then(result => {
-      let search = JSON.parse(result.text);
-      let yelpSearch = search.businesses.map(business =>{
-        const restaurantData = new Food(business);
-        restaurantData.save(query.id)
+      let parsedData = JSON.parse(result.text);
+      let restaurantData = parsedData.businesses.map(restaurantArr => {
+        let yelpData = new Food(restaurantArr.name, restaurantArr.image_url,
+          restaurantArr.price, restaurantArr.rating,
+          restaurantArr.url);
+        return yelpData;
       });
-      return yelpSearch;
+      return restaurantData;
     })
     .catch(error => handleError(error));
 }
 
-function Food(data){
-  this.name = data.name;
-  this.imag_url = data.image_url;
-  this.price = data.price;
-  this.rating = data.rating;
-  this.url = data.url;
+
+function Food(name, image_url, price, rating, url){
+  this.name = name;
+  this.image_url = image_url;
+  this.price = price;
+  this.rating = rating;
+  this.url = url;
 }
 
 Food.prototype.save = function(id){
