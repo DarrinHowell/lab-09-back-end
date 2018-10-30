@@ -7,7 +7,7 @@ const pg = require('pg');
 
 require('dotenv').config();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 const client = new pg.Client(process.env.DATABASE_URL);
 client.connect();
@@ -22,23 +22,19 @@ app.use(cors());
 
 
 
-app.get('/location', getLocation);
+app.get('/location', getLocation)
 
-app.get('/weather', getWeather);
+app.get('/weather', getWeather)
 
-app.get('/yelp', (request, response) => {
-  const yelpData = searchFood(request.query.data)
-    .then(yelpData => response.send(yelpData))
-    .catch(error => handleError(error, response));
-});
+app.get('/yelp', getFood)
 
-app.get('/movies', (request, response) => {
-  const movieData = searchMovies(request.query.data)
-    .then(movieData => response.send(movieData))
-    .catch(error => handleError(error, response));
-});
+// app.get('/movies', (request, response) => {
+//   const movieData = searchMovies(request.query.data)
+//     .then(movieData => response.send(movieData))
+//     .catch(error => handleError(error, response));
+// });
 
-app.get('/meetup', getWeather);
+// app.get('/meetup', getWeather);
 
 
 /* ------Error Handler-----
@@ -90,7 +86,8 @@ Location.getLatLongData = (query) => {
         location.save();
         return location;
       }
-    });
+    })
+    .catch(error => handleError(error));
 };
 
 // Our refactored getLocation function recieves a request and a response from the express get() function
@@ -148,17 +145,18 @@ Location.lookupLocation = (handler) => {
 // Refactored this.time to use the toDateString() to parse the object data//
 function Weather(data) {
   let day = new Date(data.time * 1000);
-  this.time = day.toDateString();
+  this.time = day.toDateString().slice(0,15);
   this.forecast = data.summary;
 }
 
-Weather.prototype.save = function(){
+Weather.prototype.save = function(id){
   let SQL = `
   INSERT INTO weather
     (forecast, time, location_id)
     VALUES($1,$2,$3)`;
 
   let values = Object.values(this);
+  values.push(id)
   client.query(SQL, values);
 };
 
@@ -167,10 +165,10 @@ Weather.lookup = function(handler){
   client.query(SQL,[handler.location.id])
     .then(results => {
       if(results.rowCount > 0){
-        console.log('Got data from sql');
+        console.log('Got weather data from SQL');
         handler.cacheHit(results);
       }else{
-        console.log('Got data from API');
+        console.log('Got weather data from API');
         handler.cacheMiss();
       }
     })
@@ -180,7 +178,7 @@ Weather.lookup = function(handler){
 
 
 Weather.searchWeather = function(query) {
-  const darkSkyData = `https://api.darksky.net/forecast/${process.env.WEATHER_API_KEY}/${query.latitude},${query.longitude}`;
+  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
 
   return superagent.get(darkSkyData)
     .then(result => {
@@ -190,13 +188,14 @@ Weather.searchWeather = function(query) {
         return summary;
       });
       return weatherSummaries;
-    });
+    })
+    .catch(error => handleError(error));
 };
 
 function getWeather(req, res){
   const weatherHandler = {
     location: req.query.data,
-    cacheHits: function(result){
+    cacheHit: function(result){
       res.send(result.rows);
     },
     cacheMiss: function() {
@@ -213,10 +212,40 @@ function getWeather(req, res){
 
 //------Yelp--------//
 
-function searchFood(query){
-  const yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
+function getFood(req, res){
+  const foodHandler = {
+    location: req.query.data,
+    cacheHit: function(result){
+      res.send(result.rows);
+    },
+    cacheMiss: function() {
+      Food.searchFood(req.query.data)
+        .then(results => res.send(results))
+        .catch(console.error);
+    }
+  };
+  Food.lookup(foodHandler);
+}
 
-  return superagent.get(yelpData)
+Food.lookup = function(handler){
+  const SQL = 'SELECT * FROM yelp WHERE location_id=$1';
+  client.query(SQL,[handler.location.id])
+    .then(results => {
+      if(results.rowCount > 0){
+        console.log('Got yelp data from SQL');
+        handler.cacheHit(results);
+      }else{
+        console.log('Got yelp data from API');
+        handler.cacheMiss();
+      }
+    })
+    .catch(error => handleError(error));
+};
+
+Food.searchFood = function (query){
+  const _yelpData = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}&term="restaurants`;
+
+  return superagent.get(_yelpData)
   //YELP documentation REQUIRED to have .set with Authorization and 'Bearer' in the process.env API Key
   //superagent returns the yelp data variable and sets authorization to the template literal.
   //this is how yelp is feed the key
@@ -225,49 +254,63 @@ function searchFood(query){
     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
     .then(result => {
       let search = JSON.parse(result.text);
-      return search.businesses.map(business =>{
-        return new Food(business);
+      let yelpSearch = search.businesses.map(business =>{
+        const restaurantData = new Food(business);
+        restaurantData.save(query.id)
       });
-    });
+      return yelpSearch;
+    })
+    .catch(error => handleError(error));
 }
 
 function Food(data){
   this.name = data.name;
-  this.url = data.url;
+  this.imag_url = data.image_url;
   this.price = data.price;
-  this.image_url = data.image_url;
   this.rating = data.rating;
+  this.url = data.url;
 }
 
-//--------Movies-------//
+Food.prototype.save = function(id){
+  let SQL = `
+  INSERT INTO yelp
+    (name, url, price, image_url, rating, location_id)
+    VALUES($1,$2,$3,$4,$5,$6)`;
+  let values = Object.values(this);
+  values.push(id)
+  client.query(SQL, values);
+};
 
-//Follow the same pattern as searchFood
-//query for movies includes the API key inside the URL.  no need for .set like in YELP.
-//we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
-//We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
-function searchMovies(query){
-  let city = query.formatted_query.split(',')[0];
-  console.log(city);
-  const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`;
 
-  return superagent.get(movieData)
-    .then(result => {
-      let movieSearch = JSON.parse(result.text);
-      return movieSearch.results.map(movie =>{
-        return new Movie(movie);
-      });
-    });
-}
+// //--------Movies-------//
 
-function Movie(data){
-  this.title = data.title;
-  this.overview = data.overview;
-  this.average_votes = data.vote_average;
-  this.total_votes = data.vote_count;
-  this.image_url = `https://image.tmdb.org/t/p/original${data.poster_path}`;
-  this.popularity = data.popularity;
-  this.released_on = data.release_date;
-}
+// //Follow the same pattern as searchFood
+// //query for movies includes the API key inside the URL.  no need for .set like in YELP.
+// //we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
+// //We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
+// function searchMovies(query){
+//   let city = query.formatted_query.split(',')[0];
+//   const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`;
+
+//   return superagent.get(movieData)
+//     .then(result => {
+//       let movieSearch = JSON.parse(result.text);
+//       return movieSearch.results.map(movie =>{
+//         return new Movie(movie);
+//       });
+//     })
+//     .catch(error => handleError(error));
+// }
+
+// function Movie(data){
+//   this.title = data.title;
+//   this.overview = data.overview;
+//   this.average_votes = data.vote_average;
+//   this.total_votes = data.vote_count;
+//   this.image_url = `https://image.tmdb.org/t/p/original${data.poster_path}`;
+//   this.popularity = data.popularity;
+//   this.released_on = data.release_date;
+// }
 //image url has prepended pathway so the path actually shows image and not just data link
 
 

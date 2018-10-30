@@ -24,7 +24,8 @@ CREATE TABLE yelp(
     url VARCHAR(255),
     price VARCHAR(255),
     image_url VARCHAR(255),
-    rating NUMERIC(2,1)
+    rating NUMERIC(2,1),
+    location_id INTEGER NOT NULL REFERENCES locations(id)
 );
 
 CREATE TABLE movies(
@@ -34,6 +35,7 @@ CREATE TABLE movies(
     average_votes NUMERIC(2,1),
     image_url VARCHAR(255),
     popularity NUMERIC(4,3),
-    released_on VARCHAR(255)
+    released_on VARCHAR(255),
+    location_id INTEGER NOT NULL REFERENCES locations(id)
 );
 
