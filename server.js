@@ -26,7 +26,7 @@ app.get('/location', getLocation)
 
 app.get('/weather', getWeather)
 
-app.get('/yelp', getFood)
+// app.get('/yelp', getFood)
 
 // app.get('/movies', (request, response) => {
 //   const movieData = searchMovies(request.query.data)
@@ -59,15 +59,26 @@ function Location(query, data) {
 }
 
 
+// in the save, tell SQL to return the ID during an insert.
+// send that ID I get back to get lat long / whatever calls the save
+// need to add id to location
+// send that id back to the client.
+
+// between saving and sending, attach an ID to that location.
+
+// location_id is coming back undefined. Need to add that to our location object.
+
+// does the query have a loction ID?
+
 
 Location.prototype.save = function(){
   let SQL = `
   INSERT INTO locations
     (search_query,formatted_query,latitude,longitude)
-    VALUES($1,$2,$3,$4)`;
+    VALUES($1,$2,$3,$4) RETURNING id`;
 
   let values = Object.values(this);
-  client.query(SQL, values);
+  return client.query(SQL, values);
 };
 
 // Our refactored getLatLongData code builds a query string and requests data from the GEOCODE API via
@@ -83,8 +94,12 @@ Location.getLatLongData = (query) => {
         throw 'No Data';
       } else {
         let location = new Location(query, data.body.results[0]);
-        location.save();
-        return location;
+        return location.save()
+          .then(results => {
+            // console.log('THESE are our new results: ', results);
+            location.id=results.rows[0].id
+            return location;
+          })
       }
     })
     .catch(error => handleError(error));
@@ -94,7 +109,7 @@ Location.getLatLongData = (query) => {
 // in which this callback is nested.
 // a location hanler object is then instantiated with a query property, a cacheHit function, and a
 // cacheMiss function. This function then sends the locationHandler to a lookupLocation function
-// outlined below. 
+// outlined below.
 function getLocation(req, res){
   const locationHandler = {
     query: req.query.data,
@@ -114,15 +129,15 @@ function getLocation(req, res){
   Location.lookupLocation(locationHandler);
 }
 
-// This method takes in a locationHandler object as outlined above in getLocation. 
+// This method takes in a locationHandler object as outlined above in getLocation.
 // This funciton creates an SQL query via pg's client object that checks if the data from the front end
-// query matches any data in our SQL database. 
+// query matches any data in our SQL database.
 // After waiting to hear back from the postgres SQL query, if the results come back with database with any rows
 // we call the cacheHit function from our handler and send data back to the front end. (This conditional)
 // is effective because location is the first query made and therefore should be the first and only row
-// in our database. 
+// in our database.
 // If we do not come back with a database that has any location data, we invoke cache.Miss from our handler
-// object and perform a query to the Google GEOCODE API. 
+// object and perform a query to the Google GEOCODE API.
 Location.lookupLocation = (handler) => {
   const SQL = 'SELECT * FROM locations WHERE search_query=$1';
   const values = [handler.query];
@@ -162,7 +177,7 @@ Weather.prototype.save = function(id){
 
 Weather.lookup = function(handler){
   const SQL = 'SELECT * FROM weather WHERE location_id=$1';
-  client.query(SQL,[handler.location.id])
+  client.query(SQL,[handler.id])
     .then(results => {
       if(results.rowCount > 0){
         console.log('Got weather data from SQL');
@@ -178,13 +193,13 @@ Weather.lookup = function(handler){
 
 
 Weather.searchWeather = function(query) {
-  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.latitude},${query.longitude}`;
+  const darkSkyData = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${query.data.latitude},${query.data.longitude}`;
 
   return superagent.get(darkSkyData)
     .then(result => {
       const weatherSummaries = result.body.daily.data.map(day => {
         const summary = new Weather(day);
-        summary.save(query.id);
+        summary.save(query.data.id);
         return summary;
       });
       return weatherSummaries;
@@ -193,13 +208,14 @@ Weather.searchWeather = function(query) {
 };
 
 function getWeather(req, res){
+  console.log('this is our req.query.data --> ', req.query.data);
   const weatherHandler = {
-    location: req.query.data,
+    id:req.query.data.id,
     cacheHit: function(result){
       res.send(result.rows);
     },
     cacheMiss: function() {
-      Weather.searchWeather(req.query.data)
+      Weather.searchWeather(req.query)
         .then(results => res.send(results))
         .catch(console.error);
     },
@@ -210,73 +226,74 @@ function getWeather(req, res){
 
 
 
-//------Yelp--------//
+// //------Yelp--------//
 
-function getFood(req, res){
-  const foodHandler = {
-    location: req.query.data,
-    cacheHit: function(result){
-      res.send(result.rows);
-    },
-    cacheMiss: function() {
-      Food.searchFood(req.query.data)
-        .then(results => res.send(results))
-        .catch(console.error);
-    }
-  };
-  Food.lookup(foodHandler);
-}
+// function getFood(req, res){
+//   const foodHandler = {
+//     location: req.query.data,
+//     cacheHit: function(result){
+//       res.send(result.rows);
+//     },
+//     cacheMiss: function() {
+//       Food.searchFood(req.query.data)
+//         .then(results => res.send(results))
+//         .catch(console.error);
+//     }
+//   };
+//   Food.lookup(foodHandler);
+// }
 
-Food.lookup = function(handler){
-  const SQL = 'SELECT * FROM yelp WHERE location_id=$1';
-  client.query(SQL,[handler.location.id])
-    .then(results => {
-      if(results.rowCount > 0){
-        console.log('Got yelp data from SQL');
-        handler.cacheHit(results);
-      }else{
-        console.log('Got yelp data from API');
-        handler.cacheMiss();
-      }
-    })
-    .catch(error => handleError(error));
-};
+// Food.lookup = function(handler){
+//   const SQL = 'SELECT * FROM yelp WHERE location_id=$1';
+//   client.query(SQL,[handler.id])
+//     .then(results => {
+//       if(results.rowCount > 0){
+//         console.log('Got yelp data from SQL');
+//         handler.cacheHit(results);
+//       }else{
+//         console.log('Got yelp data from API');
+//         handler.cacheMiss();
+//       }
+//     })
+//     .catch(error => handleError(error));
+// };
 
-Food.searchFood = function (query){
-  const _yelpURL = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}`;
-  return superagent.get(_yelpURL)
-    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
-    .then(result => {
-      let parsedData = JSON.parse(result.text);
-      let restaurantData = parsedData.businesses.map(restaurantArr => {
-        let yelpData = new Food(restaurantArr.name, restaurantArr.image_url,
-          restaurantArr.price, restaurantArr.rating,
-          restaurantArr.url);
-        return yelpData;
-      });
-      return restaurantData;
-    })
-    .catch(error => handleError(error));
-}
+// Food.searchFood = function (query){
+//   const _yelpURL = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}`;
+//   return superagent.get(_yelpURL)
+//     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+//     .then(result => {
+//       let parsedData = JSON.parse(result.text);
+//       let restaurantData = parsedData.businesses.map(restaurantArr => {
+//         let yelpData = new Food(restaurantArr.name, restaurantArr.image_url,
+//           restaurantArr.price, restaurantArr.rating,
+//           restaurantArr.url);
+//         yelpData.save(query.id);
+//         return yelpData;
+//       });
+//       return restaurantData;
+//     })
+//     .catch(error => handleError(error));
+// }
 
 
-function Food(name, image_url, price, rating, url){
-  this.name = name;
-  this.image_url = image_url;
-  this.price = price;
-  this.rating = rating;
-  this.url = url;
-}
+// function Food(name, image_url, price, rating, url){
+//   this.name = name;
+//   this.image_url = image_url;
+//   this.price = price;
+//   this.rating = rating;
+//   this.url = url;
+// }
 
-Food.prototype.save = function(id){
-  let SQL = `
-  INSERT INTO yelp
-    (name, url, price, image_url, rating, location_id)
-    VALUES($1,$2,$3,$4,$5,$6)`;
-  let values = Object.values(this);
-  values.push(id)
-  client.query(SQL, values);
-};
+// Food.prototype.save = function(id){
+//   let SQL = `
+//   INSERT INTO yelp
+//     (name, image_url, price, rating, url, location_id)
+//     VALUES($1,$2,$3,$4,$5,$6)`;
+//   let values = Object.values(this);
+//   values.push(id)
+//   client.query(SQL, values);
+// };
 
 
 // //--------Movies-------//
