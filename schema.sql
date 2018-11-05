@@ -31,8 +31,9 @@ CREATE TABLE yelp(
 CREATE TABLE movies(
     id SERIAL PRIMARY KEY,
     title VARCHAR(255),
-    overview VARCHAR(255),
+    overview VARCHAR(1000),
     average_votes NUMERIC(2,1),
+    total_votes BIGINT,
     image_url VARCHAR(255),
     popularity NUMERIC(4,3),
     released_on VARCHAR(255),
