@@ -26,7 +26,7 @@ app.get('/location', getLocation)
 
 app.get('/weather', getWeather)
 
-// app.get('/yelp', getFood)
+app.get('/yelp', getFood)
 
 // app.get('/movies', (request, response) => {
 //   const movieData = searchMovies(request.query.data)
@@ -226,9 +226,109 @@ function getWeather(req, res){
 
 
 
-// //------Yelp--------//
+//------Yelp--------//
 
-// function getFood(req, res){
+function getFood(req, res){
+  const foodHandler = {
+    id:req.query.data.id,
+    cacheHit: function(result){
+      res.send(result.rows);
+    },
+    cacheMiss: function() {
+      Food.searchFood(req.query.data)
+        .then(results => res.send(results))
+        .catch(console.error);
+    }
+  };
+  Food.lookup(foodHandler);
+}
+
+Food.lookup = function(handler){
+  const SQL = 'SELECT * FROM yelp WHERE location_id=$1';
+  client.query(SQL,[handler.id])
+    .then(results => {
+      if(results.rowCount > 0){
+        console.log('Got yelp data from SQL');
+        handler.cacheHit(results);
+      }else{
+        console.log('Got yelp data from API');
+        handler.cacheMiss();
+      }
+    })
+    .catch(error => handleError(error));
+};
+
+Food.searchFood = function (query){
+  const _yelpURL = `https://api.yelp.com/v3/businesses/search?latitude=${query.latitude}&longitude=${query.longitude}`;
+  return superagent.get(_yelpURL)
+    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+    .then(result => {
+      let parsedData = JSON.parse(result.text);
+      let restaurantData = parsedData.businesses.map(restaurantArr => {
+        let yelpData = new Food(restaurantArr.name, restaurantArr.image_url,
+          restaurantArr.price, restaurantArr.rating,
+          restaurantArr.url);
+        yelpData.save(query.id);
+        return yelpData;
+      });
+      return restaurantData;
+    })
+    .catch(error => handleError(error));
+}
+
+
+function Food(name, image_url, price, rating, url){
+  this.name = name;
+  this.image_url = image_url;
+  this.price = price;
+  this.rating = rating;
+  this.url = url;
+}
+
+Food.prototype.save = function(id){
+  let SQL = `
+  INSERT INTO yelp
+    (name, image_url, price, rating, url, location_id)
+    VALUES($1,$2,$3,$4,$5,$6)`;
+  let values = Object.values(this);
+  values.push(id)
+  client.query(SQL, values);
+};
+
+
+// //--------Movies-------//
+
+// //Follow the same pattern as searchFood
+// //query for movies includes the API key inside the URL.  no need for .set like in YELP.
+// //we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
+// //We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
+// function searchMovies(query){
+//   let city = query.formatted_query.split(',')[0];
+//   const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`;
+
+//   return superagent.get(movieData)
+//     .then(result => {
+//       let movieSearch = JSON.parse(result.text);
+//       return movieSearch.results.map(movie =>{
+//         return new Movie(movie);
+//       });
+//     })
+//     .catch(error => handleError(error));
+// }
+
+// function Movie(data){
+//   this.title = data.title;
+//   this.overview = data.overview;
+//   this.average_votes = data.vote_average;
+//   this.total_votes = data.vote_count;
+//   this.image_url = `https://image.tmdb.org/t/p/original${data.poster_path}`;
+//   this.popularity = data.popularity;
+//   this.released_on = data.release_date;
+// }
+// // image url has prepended pathway so the path actually shows image and not just data link
+
+
+// function getMovies(req, res){
 //   const foodHandler = {
 //     location: req.query.data,
 //     cacheHit: function(result){
@@ -294,38 +394,6 @@ function getWeather(req, res){
 //   values.push(id)
 //   client.query(SQL, values);
 // };
-
-
-// //--------Movies-------//
-
-// //Follow the same pattern as searchFood
-// //query for movies includes the API key inside the URL.  no need for .set like in YELP.
-// //we then use superagent .get to recieve data from the API by feeding that URL that's assigned to movieData variable.
-// //We then normalize the data.  Then send it back to the front-end after returning to our app .get query.
-// function searchMovies(query){
-//   let city = query.formatted_query.split(',')[0];
-//   const movieData = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${city}`;
-
-//   return superagent.get(movieData)
-//     .then(result => {
-//       let movieSearch = JSON.parse(result.text);
-//       return movieSearch.results.map(movie =>{
-//         return new Movie(movie);
-//       });
-//     })
-//     .catch(error => handleError(error));
-// }
-
-// function Movie(data){
-//   this.title = data.title;
-//   this.overview = data.overview;
-//   this.average_votes = data.vote_average;
-//   this.total_votes = data.vote_count;
-//   this.image_url = `https://image.tmdb.org/t/p/original${data.poster_path}`;
-//   this.popularity = data.popularity;
-//   this.released_on = data.release_date;
-// }
-//image url has prepended pathway so the path actually shows image and not just data link
 
 
 app.listen(PORT, () => console.log(`App is up on ${PORT}`));
